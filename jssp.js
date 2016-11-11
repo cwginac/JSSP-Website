@@ -1,98 +1,74 @@
- var MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-        var randomScalingFactor = function() {
-            return Math.round(Math.random() * 100 * (Math.random() > 0.5 ? -1 : 1));
-        };
-        var randomColorFactor = function() {
-            return Math.round(Math.random() * 255);
-        };
-        var randomColor = function(opacity) {
-            return 'rgba(' + randomColorFactor() + ',' + randomColorFactor() + ',' + randomColorFactor() + ',' + (opacity || '.3') + ')';
-        };
+'use strict';
 
-        var config = {
-            type: 'line',
-            data: {
-                labels: [0],
-                datasets: [{
-                    label: "My First dataset",
-                    data: [0],
-                    fill: false,
-                    borderDash: [5, 5],
-                }]
-            },
-            options: {
-                responsive: false,
-                legend: {
-                    position: 'bottom',
-                },
-                hover: {
-                    mode: 'label'
-                },
-                scales: {
-                    xAxes: [{
-                        display: true,
-                        scaleLabel: {
-                            display: true,
-                            labelString: 'Month'
-                        }
-                    }],
-                    yAxes: [{
-                        display: true,
-                        scaleLabel: {
-                            display: true,
-                            labelString: 'Value'
-                        }
-                    }]
-                },
-                title: {
-                    display: true,
-                    text: 'Chart.js Line Chart - Legend'
-                }
-            }
-        };
+var graph_config = {
+	type: 'line',
 
-        $.each(config.data.datasets, function(i, dataset) {
-            var background = randomColor(0.5);
-            dataset.borderColor = background;
-            dataset.backgroundColor = background;
-            dataset.pointBorderColor = background;
-            dataset.pointBackgroundColor = background;
-            dataset.pointBorderWidth = 1;
-        });
+	data: {
+		labels: [],
+		datasets: [{
+			label: 'Idle Cycles',
+			data: [],
+			borderColor: ['rgba(57,222,222,1)'],
+			fill: false,
+		}]
+	},
 
-        window.onload = function() {
-            var ctx = document.getElementById("myChart");
-            window.myLine = new Chart(ctx, config);
+	options: {
+		responsive: false,
+		legend: {
+			position: 'bottom',
+		},
+		scales: {
+			xAxes: [{
+				display: true,
+				scaleLabel: {
+					display: true,
+					labelString: 'Number Of Evaluations'
+				}
+			}],
+			yAxes: [{
+				display: true,
+				scaleLabel: {
+					display: true,
+					labelString: 'Idle Cycles'
+				}
+			}]
+		},
+		title: {
+			display: true,
+			text: 'Current Progress'
+		}
+	},
+};
 
-            //$('#addData').click(function() {
-            document.getElementById('addData').addEventListener('click', function(event) {
-                if (config.data.datasets.length > 0) {
-                    config.data.labels.push("NEW!");
+window.onload = function () {
+	var ctx = document.getElementById('myChart');
+	window.myChart = new Chart(ctx, graph_config);
 
-                    $.each(config.data.datasets, function(i, dataset) {
-                        dataset.data.push(55);
-                    });
+	//addEventListeners();
 
-                    window.myLine.update();
-                }
-            });
-        };
+	// Test, update graph every second
+	setInterval(testGraph, 1000);
+};
 
+/*
+function addEventListeners () {
 
+}
+*/
 
+var i = 0;
+function testGraph () {
 
-       	var myVar = setInterval (updateGraph, 1000);
-       	var j = 0;
+	if(i % 10 === 0) {
+		updateGraph(i, i);
+	}
+	i++;
+}
 
-       	function updateGraph() {
-       		j++;
-       		if (config.data.datasets.length > 0) {
-                config.data.labels.push(j);
+function updateGraph(value, label) {
+	graph_config.data.datasets[0].data.push(value);
+	graph_config.data.labels.push(label);
 
-                $.each(config.data.datasets, function(i, dataset) {
-                    dataset.data.push(j);
-                });
-
-                window.myLine.update();
-            }
-       	}
+	window.myChart.update();
+}
