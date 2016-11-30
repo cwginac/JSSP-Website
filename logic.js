@@ -1,20 +1,20 @@
 'use strict';
 
 var jssp = {
-	jobs: []
+	jobs: [],
+	machines: [],
+	currentTime: 0,
+	dataTable: {},
+	operationsToSchedule: []
 };
-
-var dataTable = {};
-var machines = [];
-var time = 0;
 
 function parseData () {
 	// Reset Everything
 	clearConsole();
 	createDataTable();
 	jssp.jobs = [];
-	machines = [];
-	time = 0;
+	jssp.machines = [];
+	jssp.currentTime = 0;
 
 	// Start Parsing Data
 	var text = document.getElementById('textinput').value;
@@ -56,8 +56,6 @@ function parseData () {
 		jssp.jobs.push(job);
 	}
 
-
-
 	for (var m = 0; m < 5; m++) {
 		var machine = {
 			id: m,
@@ -66,7 +64,7 @@ function parseData () {
 			idleCycles: 0,
 			running: false,
 		};
-		machines.push(machine);
+		jssp.machines.push(machine);
 	}
 
 	schedule();
@@ -92,10 +90,34 @@ function schedule() {
 			sortingFunction = leastOperationsRemaining;
 		}
 
-		gAndT(sortingFunction);
+		var method = Math.floor(Math.random() * 2);
+		var methodFunction;
+		if (method === 0) {
+			methodFunction = gAndT;
+		}
+		else {
+			methodFunction = nonDelay;
+		}
+
+		updateAvailableMachines();
+
+		var somethingToSchedule = true;
+		while (somethingToSchedule === true) {
+			somethingToSchedule = false;
+			populateSchedulableOperations();
+			for (var a = 0; a < jssp.operationsToSchedule.length; a++) {
+				if (jssp.machines[jssp.operationsToSchedule[a].machine].running === false) {
+					somethingToSchedule = true;
+				}
+			}
+			if(somethingToSchedule === true) {
+				//nonDelay(sortingFunction);
+				gAndT(sortingFunction);
+			}
+		}
 
 		// Increment timestep
-		time++;
+		jssp.currentTime++;
 
 		// For now this will be if there are no more jobs to schedule.  Will have to use latest finishing machine as ending time
 		var completedJobs = 0;
@@ -110,18 +132,68 @@ function schedule() {
 		}
 	}
 
-	var machinesJson = JSON.stringify(machines);
-
-	console.log(machinesJson);
-
 	var container = document.getElementById('barchart_material');
 	var chart = new google.visualization.Timeline(container);
-	chart.draw(dataTable);
+	chart.draw(jssp.dataTable);
+}
+
+function populateSchedulableOperations() {
+	jssp.operationsToSchedule = [];
+	var numJobs = jssp.jobs.length;
+
+	for (var d = 0; d < numJobs; d++) {
+		if (jssp.jobs[d].finished !== true && jssp.jobs[d].running !== true) {
+			jssp.operationsToSchedule.push(jssp.jobs[d].instructions[0]);
+		}
+	}
+}
+
+function updateAvailableMachines() {
+	var numMachines = jssp.machines.length;
+	for (var z = 0; z < numMachines; z++) {
+		if (jssp.machines[z].nextAvailable <= jssp.currentTime) {
+			if(jssp.machines[z].running === true) {
+				var runningJob = jssp.machines[z].scheduledOperations[jssp.machines[z].scheduledOperations.length - 1].jobId;
+				jssp.jobs[runningJob].running = false;
+				jssp.machines[z].running = false;
+			}
+		}
+	}
+}
+
+function scheduleAnOperation (operation) {
+	// Add timing information to this job
+	operation.start = jssp.currentTime;
+	operation.end = jssp.currentTime + parseInt(operation.time, 10);
+
+
+	// Add this job to the scheduled list
+	jssp.machines[operation.machine].scheduledOperations.push(operation);
+	jssp.machines[operation.machine].nextAvailable = jssp.currentTime + parseInt(operation.time, 10);
+	jssp.machines[operation.machine].running = true;
+
+	// Get a handle to the actual job, remove this operation from the remaining work
+	// and mark it as running
+	var job = operation.jobId;
+	jssp.jobs[job].instructions.splice(0,1);
+	jssp.jobs[job].running = true;
+
+	// Add information to the gantt chart data structure
+	jssp.dataTable.addRow([operation.machine.toString(), job.toString(), operation.start, operation.end]);
+
+	outputToPage('Scheduled job ' + job + ' with machine ' + operation.machine.toString() + ' at time ' + jssp.currentTime);
+	// If there is no more remaining work for this job, mark it as complete
+	if(jssp.jobs[job].instructions.length === 0) {
+		jssp.jobs[job].finished = true;
+		console.log('Job ' + job + ' finished at timestep ' + operation.end + '!');
+		outputToPage('Job ' + job + ' finished at timestep ' + operation.end + '!');
+	}
 }
 
 function gAndT(sortingFunction) {
 	var numJobs = jssp.jobs.length;
-	var numMachines = machines.length;
+	var numMachines = jssp.machines.length;
+	var numOperationsToSchedule = jssp.operationsToSchedule.length;
 
 	// The difference between G&T and Non-Delay is the step where you:
 	// "Calculate the completion time of all operations in C and let m* equal
@@ -148,133 +220,39 @@ function gAndT(sortingFunction) {
 		return a.time - b.time;
 	});
 
-	// c = machine
-	for (var z = 0; z < numMachines; z++) {
-		var c = machineArray[0].id;
-		machineArray.splice(0,1);
-		
-		if (machines[c].nextAvailable <= time) {
-			if(machines[c].running === true) {
-				var runningJob = machines[c].scheduledOperations[machines[c].scheduledOperations.length - 1].jobId;
-				jssp.jobs[runningJob].running = false;
-				machines[c].running = false;
-			}
+	jssp.operationsToSchedule.sort(sortingFunction);
 
-			// Looking for jobs that next item is for machine C
-			var jobsForThisMachine = [];
-
-			// d = job
-			for (var d = 0; d < numJobs; d++) {
-				if (jssp.jobs[d].finished !== true && jssp.jobs[d].running !== true && jssp.jobs[d].instructions[0].machine == c) {
-					jobsForThisMachine.push(jssp.jobs[d].instructions[0]);
+	for (var b = 0; b < numMachines; b++) {
+		if(jssp.machines[machineArray[b].id].running === false) {
+			for (var c = 0; c < numOperationsToSchedule; c++) {
+				if(parseInt(jssp.operationsToSchedule[c].machine, 10) === machineArray[b].id) {
+					scheduleAnOperation(jssp.operationsToSchedule[c]);
+					return;
 				}
-			}
-
-			// Apply Hueristic
-			jobsForThisMachine.sort(sortingFunction);
-
-			// If there is a job for this machine, schedule it
-			if(jobsForThisMachine.length > 0) {
-				// Add timing information to this job
-				jobsForThisMachine[0].start = time;
-				jobsForThisMachine[0].end = time + parseInt(jobsForThisMachine[0].time, 10);
-
-				// Add this job to the scheduled list
-				machines[c].scheduledOperations.push(jobsForThisMachine[0]);
-				machines[c].nextAvailable = time + parseInt(jobsForThisMachine[0].time, 10);
-				machines[c].running = true;
-
-				// Get a handle to the actual job, remove this operation from the remaining work
-				// and mark it as running
-				var job = jobsForThisMachine[0].jobId;
-				jssp.jobs[job].instructions.splice(0,1);
-				jssp.jobs[job].running = true;
-
-				// Add information to the gantt chart data structure
-				dataTable.addRow([c.toString(), job.toString(), jobsForThisMachine[0].start, jobsForThisMachine[0].end]);
-
-				// If there is no more remaining work for this job, mark it as complete
-				if(jssp.jobs[job].instructions.length === 0) {
-					jssp.jobs[job].finished = true;
-					console.log('Job ' + job + ' finished at timestep ' + jobsForThisMachine[0].end + '!');
-					outputToPage('Job ' + job + ' finished at timestep ' + jobsForThisMachine[0].end + '!');
-				}
-			}
-			// Else, just let this machine sit empty
-			else {
-				machines[c].idleCycles++;
 			}
 		}
 	}
 }
 
 function nonDelay(sortingFunction) {
-	var numJobs = jssp.jobs.length;
+	var numOperationsToSchedule = jssp.operationsToSchedule.length;
+	jssp.operationsToSchedule.sort(sortingFunction);
 
-	// c = machine
-	for (var c = 0; c < 5; c++) {
+	var a = 0;
 
-		if (machines[c].nextAvailable <= time) {
-			if(machines[c].running === true) {
-				var runningJob = machines[c].scheduledOperations[machines[c].scheduledOperations.length - 1].jobId;
-				jssp.jobs[runningJob].running = false;
-				machines[c].running = false;
-			}
-
-			// Looking for jobs that next item is for machine C
-			var jobsForThisMachine = [];
-
-			// d = job
-			for (var d = 0; d < numJobs; d++) {
-				if (jssp.jobs[d].finished !== true && jssp.jobs[d].running !== true && jssp.jobs[d].instructions[0].machine == c) {
-					jobsForThisMachine.push(jssp.jobs[d].instructions[0]);
-				}
-			}
-
-			// Apply Hueristic
-			jobsForThisMachine.sort(sortingFunction);
-
-			// If there is a job for this machine, schedule it
-			if(jobsForThisMachine.length > 0) {
-				// Add timing information to this job
-				jobsForThisMachine[0].start = time;
-				jobsForThisMachine[0].end = time + parseInt(jobsForThisMachine[0].time, 10);
-
-				// Add this job to the scheduled list
-				machines[c].scheduledOperations.push(jobsForThisMachine[0]);
-				machines[c].nextAvailable = time + parseInt(jobsForThisMachine[0].time, 10);
-				machines[c].running = true;
-
-				// Get a handle to the actual job, remove this operation from the remaining work
-				// and mark it as running
-				var job = jobsForThisMachine[0].jobId;
-				jssp.jobs[job].instructions.splice(0,1);
-				jssp.jobs[job].running = true;
-
-				// Add information to the gantt chart data structure
-				dataTable.addRow([c.toString(), job.toString(), jobsForThisMachine[0].start, jobsForThisMachine[0].end]);
-
-				// If there is no more remaining work for this job, mark it as complete
-				if(jssp.jobs[job].instructions.length === 0) {
-					jssp.jobs[job].finished = true;
-					console.log('Job ' + job + ' finished at timestep ' + jobsForThisMachine[0].end + '!');
-					outputToPage('Job ' + job + ' finished at timestep ' + jobsForThisMachine[0].end + '!');
-				}
-			}
-			// Else, just let this machine sit empty
-			else {
-				machines[c].idleCycles++;
-			}
-		}
+	while (a < numOperationsToSchedule && jssp.machines[jssp.operationsToSchedule[a].machine].running === true) {
+		a++;
 	}
+
+	scheduleAnOperation(jssp.operationsToSchedule[a]);
 }
 
 function createDataTable () {
-	dataTable = new google.visualization.DataTable();
-	dataTable.addColumn({type: 'string', id: 'Machine'});
-	dataTable.addColumn({type: 'string', id: 'Job'});
-	dataTable.addColumn({type: 'number', id: 'Start'});
-	dataTable.addColumn({type: 'number', id: 'End'});
+	jssp.dataTable = new google.visualization.DataTable();
+	jssp.dataTable.addColumn({type: 'string', id: 'Machine'});
+	jssp.dataTable.addColumn({type: 'string', id: 'Job'});
+	jssp.dataTable.addColumn({type: 'number', id: 'Start'});
+	jssp.dataTable.addColumn({type: 'number', id: 'End'});
 }
 
 /////////////////// Hueristics ///////////////////
