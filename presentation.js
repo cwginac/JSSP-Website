@@ -9,7 +9,7 @@ window.onload = function () {
 function addEventListeners () {
 	var $parseButton = document.getElementById('parseData');
 
-	$parseButton.addEventListener('click', parseData);
+	$parseButton.addEventListener('click', initialize);
 
 }
 
