@@ -1,7 +1,7 @@
 'use strict';
 
 class Individual {
-	constructor (inputString) {
+	constructor (inputString, gaPattern) {
 		this.inputString = inputString;
 		this.jssp = {
 			jobs: [],
@@ -10,15 +10,18 @@ class Individual {
 			dataTable: {},
 			operationsToSchedule: []
 		};
-
+		this.currentGaPatternElement = 0;
+		this.gaPattern = gaPattern;
 		this.totalTime = -1;
 
 		this.parseData();
+
+		
 	}
 
 	parseData () {
 		// Reset Everything
-		clearConsole();
+		//clearConsole();
 		this.createDataTable();
 		this.jssp.jobs = [];
 		this.jssp.machines = [];
@@ -58,8 +61,7 @@ class Individual {
 				}
 			}
 
-			console.log('Job ' + c + ' time: ' + jobTime);
-			outputToPage('Job ' + c + ' time: ' + jobTime);
+			//outputToPage('Job ' + c + ' time: ' + jobTime);
 
 			this.jssp.jobs.push(job);
 		}
@@ -83,7 +85,7 @@ class Individual {
 		var finished = false;
 
 		while (finished === false) {
-			var heuristic = Math.floor(Math.random() * 4);
+			var heuristic = this.gaPattern[this.currentGaPatternElement].heuristic;
 			var sortingFunction;
 			if (heuristic === 0) {
 				sortingFunction = this.shortestOperation.bind(this);
@@ -98,7 +100,7 @@ class Individual {
 				sortingFunction = this.leastOperationsRemaining.bind(this);
 			}
 
-			var method = Math.floor(Math.random() * 2);
+			var method = this.gaPattern[this.currentGaPatternElement].method;
 			var methodFunction;
 			if (method === 0) {
 				methodFunction = this.gAndT;
@@ -191,12 +193,15 @@ class Individual {
 		// Add information to the gantt chart data structure
 		this.jssp.dataTable.addRow([operation.machine.toString(), job.toString(), operation.start, operation.end]);
 
-		outputToPage('Scheduled job ' + job + ' with machine ' + operation.machine.toString() + ' at time ' + this.jssp.currentTime);
+		// Increment to next element in GA
+		this.currentGaPatternElement++;
+
+		//outputToPage('Scheduled job ' + job + ' with machine ' + operation.machine.toString() + ' at time ' + this.jssp.currentTime);
 		// If there is no more remaining work for this job, mark it as complete
 		if(this.jssp.jobs[job].instructions.length === 0) {
 			this.jssp.jobs[job].finished = true;
 			console.log('Job ' + job + ' finished at timestep ' + operation.end + '!');
-			outputToPage('Job ' + job + ' finished at timestep ' + operation.end + '!');
+			// outputToPage('Job ' + job + ' finished at timestep ' + operation.end + '!');
 			this.totalTime = operation.end;
 		}
 	}
@@ -303,13 +308,49 @@ class Individual {
 function initialize () {
 	var text = document.getElementById('textinput').value;
 
-	var i = new Individual(text);
-	var c = new Individual(text);
+	var jobsArray = text.split('\n');
 
-	if(i.totalTime < c.totalTime) {
-		i.draw();
+	var numJobs = jobsArray.length;
+
+	for(var c = 0; c < numJobs; c++) {
+		var array = jobsArray[c].split('  ');
 	}
-	else {
-		c.draw();
+
+	var numMachines = array.length / 2;
+
+	var bestIndividual = {};
+
+	// GA
+	for(var generation = 0; generation < 30; generation++) {
+		var individuals = [];
+
+		for(var individual = 0; individual < 30; individual++) {
+			var gaPattern = [];
+
+			for(var machine = 0; machine < numMachines; machine++) {
+				for(var job = 0; job < numJobs; job++) {
+					var pair = {
+						method: Math.floor(Math.random() * 2),
+						heuristic: Math.floor(Math.random() * 4)
+					}
+					gaPattern.push(pair);
+				}
+			}
+			individuals.push(new Individual(text, gaPattern));
+		}
+
+		individuals.sort(function (a, b) {
+			return a.totalTime - b.totalTime;
+		});
+
+		individuals[0].draw();
+
+		if(individuals[0].totalTime < bestIndividual.totalTime || generation === 0) {
+			bestIndividual = individuals[0];
+			outputToPage("New Best Individual!")
+		}
+		outputToPage("Best individual for generation " + generation.toString() + " finished at timestep " + individuals[0].totalTime.toString());
+		outputToPage("Best individual overall at generation " + generation.toString() + " finished at timestep " + bestIndividual.totalTime.toString());
 	}
+
 }
