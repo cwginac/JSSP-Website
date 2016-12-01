@@ -1,5 +1,6 @@
 'use strict';
 
+
 class Individual {
 	constructor (inputString, gaPattern) {
 		this.inputString = inputString;
@@ -19,16 +20,18 @@ class Individual {
 		
 	}
 
+	/**
+	 * Parses the data that was given in constructor (this.inputString), sets up the jobs and machines, then calls {@link schedule}
+	 */
 	parseData () {
 		// Reset Everything
-		//clearConsole();
 		this.createDataTable();
 		this.jssp.jobs = [];
 		this.jssp.machines = [];
 		this.jssp.currentTime = 0;
 
 		// Start Parsing Data
-		var text =  this.inputString; //document.getElementById('textinput').value;
+		var text =  this.inputString;
 
 		var jobsArray = text.split('\n');
 
@@ -60,9 +63,6 @@ class Individual {
 					instruction = {};
 				}
 			}
-
-			//outputToPage('Job ' + c + ' time: ' + jobTime);
-
 			this.jssp.jobs.push(job);
 		}
 
@@ -80,6 +80,9 @@ class Individual {
 		this.schedule();
 	}
 
+	/**
+	 * Schedules all jobs and operations.  Once this function is finished, JSSP is scheduled.
+	 */
 	schedule() {
 		var numJobs = this.jssp.jobs.length;
 		var finished = false;
@@ -98,6 +101,12 @@ class Individual {
 			}
 			else if (heuristic === 3) {
 				sortingFunction = this.leastOperationsRemaining.bind(this);
+			}
+			else if (heuristic === 4) {
+				sortingFunction = this.leastTimeRemaining.bind(this);
+			}
+			else {
+				sortingFunction = this.mostTimeRemaining.bind(this);
 			}
 
 			var method = this.gaPattern[this.currentGaPatternElement].method;
@@ -129,7 +138,7 @@ class Individual {
 			// Increment timestep
 			this.jssp.currentTime++;
 
-			// For now this will be if there are no more jobs to schedule.  Will have to use latest finishing machine as ending time
+			// See if we have finished this JSSP
 			var completedJobs = 0;
 			for (var j = 0; j < numJobs; j++) {
 				if (this.jssp.jobs[j].finished === true) {
@@ -143,12 +152,19 @@ class Individual {
 		}
 	}
 
+	/**
+	 * Draws the gantt chart for this JSSP.
+	 * Check out {@link https://developers.google.com/chart/interactive/docs/gallery/barchart#stacked-bar-charts|Google Charts - Barchart}
+	 */
 	draw() {
 		var container = document.getElementById('barchart_material');
 		var chart = new google.visualization.Timeline(container);
 		chart.draw(this.jssp.dataTable);
 	}
 
+	/**
+	 * Populates this.jssp.operationsToSchedule with operations that are ready to be scheduled (only if the machine they want on isn't running)
+	 */
 	populateSchedulableOperations() {
 		this.jssp.operationsToSchedule = [];
 		var numJobs = this.jssp.jobs.length;
@@ -160,6 +176,9 @@ class Individual {
 		}
 	}
 
+	/**
+	 * Updates this.jssp.machines with what machines are ready for new operations.
+	 */
 	updateAvailableMachines() {
 		var numMachines = this.jssp.machines.length;
 		for (var z = 0; z < numMachines; z++) {
@@ -173,6 +192,10 @@ class Individual {
 		}
 	}
 
+	/**
+	 * Schedules operation on a specific machine.
+	 * @param  {object} operation [operation from job that was created in {@link parseData}]
+	 */
 	scheduleAnOperation (operation) {
 		// Add timing information to this job
 		operation.start = this.jssp.currentTime;
@@ -196,7 +219,6 @@ class Individual {
 		// Increment to next element in GA
 		this.currentGaPatternElement++;
 
-		//outputToPage('Scheduled job ' + job + ' with machine ' + operation.machine.toString() + ' at time ' + this.jssp.currentTime);
 		// If there is no more remaining work for this job, mark it as complete
 		if(this.jssp.jobs[job].instructions.length === 0) {
 			this.jssp.jobs[job].finished = true;
@@ -206,6 +228,11 @@ class Individual {
 		}
 	}
 
+	/**
+	 * Giffler and Thompson Algorithm
+	 * One of the methods to schedule operations by, this one will find the machine that has the least time to completion and schedules an operation chosen by sortingFunction (heuristic)
+	 * @param  {function} sortingFunction [hueristic to sort this.schedulableOperations by]
+	 */
 	gAndT(sortingFunction) {
 		var numJobs = this.jssp.jobs.length;
 		var numMachines = this.jssp.machines.length;
@@ -250,6 +277,10 @@ class Individual {
 		}
 	}
 
+	/**
+	 * One of the methods to schedule operations by, this one schedules an operation (on any available machine) chosen by sortingFunction (heuristic)
+	 * @param  {function} sortingFunction [hueristic to sort this.schedulableOperations by]
+	 */
 	nonDelay(sortingFunction) {
 		var numOperationsToSchedule = this.jssp.operationsToSchedule.length;
 		this.jssp.operationsToSchedule.sort(sortingFunction);
@@ -260,9 +291,12 @@ class Individual {
 			a++;
 		}
 
-		this.scheduleAnOperation(jssp.operationsToSchedule[a]);
+		this.scheduleAnOperation(this.jssp.operationsToSchedule[a]);
 	}
 
+	/**
+	 * Sets up DataTable for the Google Chart (see {@link https://developers.google.com/chart/interactive/docs/gallery/barchart#data-format})
+	 */
 	createDataTable () {
 		this.jssp.dataTable = new google.visualization.DataTable();
 		this.jssp.dataTable.addColumn({type: 'string', id: 'Machine'});
@@ -284,6 +318,34 @@ class Individual {
 
 	longestOperation (a, b) {
 		return (-1 * this.shortestOperation(a, b));
+	}
+
+	leastTimeRemaining (a, b) {
+		var aJobOperationsRemaining = this.jssp.jobs[a.jobId].instructions.length;
+		var bJobOperationsRemaining = this.jssp.jobs[b.jobId].instructions.length;
+
+		var aTimeRemaining = 0;
+		var bTimeRemaining = 0;
+
+		for(var aCount = 0; aCount < aJobOperationsRemaining; aCount++) {
+			aTimeRemaining += this.jssp.jobs[a.jobId].instructions[aCount].time;
+		}
+
+		for(var bCount = 0; bCount < bJobOperationsRemaining; bCount++) {
+			bTimeRemaining += this.jssp.jobs[b.jobId].instructions[bCount].time;
+		}
+
+		if (aTimeRemaining < bTimeRemaining) {
+			return -1;
+		}
+		if (aTimeRemaining > bTimeRemaining) {
+			return 1;
+		}
+		return 0;
+	}
+
+	mostTimeRemaining (a, b) {
+		return (-1 * this.leastTimeRemaining(a, b));	
 	}
 
 	leastOperationsRemaining (a, b) {
@@ -312,33 +374,31 @@ function initialize () {
 
 	var numJobs = jobsArray.length;
 
-	for(var c = 0; c < numJobs; c++) {
-		var array = jobsArray[c].split('  ');
-	}
+	
+	var	array = jobsArray[0].split('  ');
 
 	var numMachines = array.length / 2;
 
 	var bestIndividual = {};
+	var individuals = [];
 
+	for(var individual = 0; individual < 30; individual++) {
+		var gaPattern = [];
+
+		for(var machine = 0; machine < numMachines; machine++) {
+			for(var job = 0; job < numJobs; job++) {
+				var pair = {
+					method: Math.floor(Math.random() * 2),
+					heuristic: Math.floor(Math.random() * 6)
+				};
+				gaPattern.push(pair);
+			}
+		}
+		individuals.push(new Individual(text, gaPattern));
+	}
 	// GA
 	for(var generation = 0; generation < 30; generation++) {
-		var individuals = [];
-
-		for(var individual = 0; individual < 30; individual++) {
-			var gaPattern = [];
-
-			for(var machine = 0; machine < numMachines; machine++) {
-				for(var job = 0; job < numJobs; job++) {
-					var pair = {
-						method: Math.floor(Math.random() * 2),
-						heuristic: Math.floor(Math.random() * 4)
-					}
-					gaPattern.push(pair);
-				}
-			}
-			individuals.push(new Individual(text, gaPattern));
-		}
-
+		
 		individuals.sort(function (a, b) {
 			return a.totalTime - b.totalTime;
 		});
@@ -347,10 +407,57 @@ function initialize () {
 
 		if(individuals[0].totalTime < bestIndividual.totalTime || generation === 0) {
 			bestIndividual = individuals[0];
-			outputToPage("New Best Individual!")
+			outputToPage("New Best Individual!");
 		}
 		outputToPage("Best individual for generation " + generation.toString() + " finished at timestep " + individuals[0].totalTime.toString());
 		outputToPage("Best individual overall at generation " + generation.toString() + " finished at timestep " + bestIndividual.totalTime.toString());
+
+		var newGAPattern = [];
+
+		// 1+2+3+4+...+30 = 465
+		for(var parent = 0; parent < 30; parent++) {
+			var rankBased = Math.floor(Math.random() * 465);
+
+			var runningRank = 0;
+			var rank = 0;
+			for(rank = 0; rank < 30 && rankBased > runningRank; rank++) {
+				runningRank += (30-rank);
+			}
+			newGAPattern.push(individuals[rank].gaPattern);
+
+			// Mutation
+			for(var chromosome = 0; chromosome < (numJobs * numMachines); chromosome++) {
+				var mutation = Math.random();
+
+				if(mutation < 0.10) {
+					var newHeuristic = Math.floor(Math.random() * 6);
+					newGAPattern[parent][chromosome].heuristic = newHeuristic;
+					mutation = Math.random();
+					if(mutation < 0.50) {
+						var newMethod = Math.floor(Math.random() * 2);
+						newGAPattern[parent][chromosome].method = newMethod;
+					}
+				}
+			}
+			
+			// Crossover
+			if (parent % 2 === 0 && parent > 0) {
+				// Crossover always happens
+				var crossoverPoint = Math.floor(Math.random () * (numJobs * numMachines - 1));
+
+				for(var crossover = crossoverPoint; crossover < (numJobs * numMachines); crossover++) {
+					var temp = newGAPattern[parent][crossover];
+					newGAPattern[parent][crossover] = newGAPattern[parent - 1][crossover];
+					newGAPattern[parent - 1][crossover] = temp;
+				}
+			}
+		}
+
+		// Kill off parents, let the children rule the world (like Lord of the Flies)
+		individuals = [];
+		for(var children = 0; children < 30; children++) {
+			individuals.push(new Individual(text, newGAPattern[children]));
+		}
 	}
 
 }
