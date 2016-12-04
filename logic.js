@@ -1,6 +1,5 @@
 'use strict';
 
-
 class Individual {
 	constructor (inputString, gaPattern) {
 		this.inputString = inputString;
@@ -16,8 +15,6 @@ class Individual {
 		this.totalTime = -1;
 
 		this.parseData();
-
-		
 	}
 
 	/**
@@ -159,6 +156,8 @@ class Individual {
 	draw() {
 		var container = document.getElementById('barchart_material');
 		var chart = new google.visualization.Timeline(container);
+
+		this.jssp.dataTable.sort(0);
 		chart.draw(this.jssp.dataTable);
 	}
 
@@ -214,7 +213,7 @@ class Individual {
 		this.jssp.jobs[job].running = true;
 
 		// Add information to the gantt chart data structure
-		this.jssp.dataTable.addRow([operation.machine.toString(), job.toString(), operation.start, operation.end]);
+		this.jssp.dataTable.addRow(['Machine ' + operation.machine.toString(), job.toString(), operation.start, operation.end]);
 
 		// Increment to next element in GA
 		this.currentGaPatternElement++;
@@ -222,7 +221,6 @@ class Individual {
 		// If there is no more remaining work for this job, mark it as complete
 		if(this.jssp.jobs[job].instructions.length === 0) {
 			this.jssp.jobs[job].finished = true;
-			console.log('Job ' + job + ' finished at timestep ' + operation.end + '!');
 			// outputToPage('Job ' + job + ' finished at timestep ' + operation.end + '!');
 			this.totalTime = operation.end;
 		}
@@ -368,25 +366,30 @@ class Individual {
 }
 
 function initialize () {
-	var text = document.getElementById('textinput').value;
 
-	var jobsArray = text.split('\n');
+	var variables = {
+		text: document.getElementById('textinput').value,
+		numJobs: 0,
+		numMachines: 0,
+		bestIndividual: {},
+		generation: 0
+	};
 
-	var numJobs = jobsArray.length;
+	var jobsArray = variables.text.split('\n');
 
-	
+	variables.numJobs = jobsArray.length;
+
 	var	array = jobsArray[0].split('  ');
 
-	var numMachines = array.length / 2;
+	variables.numMachines = array.length / 2;
 
-	var bestIndividual = {};
 	var individuals = [];
 
 	for(var individual = 0; individual < 30; individual++) {
 		var gaPattern = [];
 
-		for(var machine = 0; machine < numMachines; machine++) {
-			for(var job = 0; job < numJobs; job++) {
+		for(var machine = 0; machine < variables.numMachines; machine++) {
+			for(var job = 0; job < variables.numJobs; job++) {
 				var pair = {
 					method: Math.floor(Math.random() * 2),
 					heuristic: Math.floor(Math.random() * 6)
@@ -394,70 +397,88 @@ function initialize () {
 				gaPattern.push(pair);
 			}
 		}
-		individuals.push(new Individual(text, gaPattern));
+		individuals.push(new Individual(variables.text, gaPattern));
 	}
-	// GA
-	for(var generation = 0; generation < 30; generation++) {
+	generation(individuals, variables)
+}
+
+function generation (individuals, variables) {
+	console.log('New generation');
+	individuals.sort(function (a, b) {
+		return a.totalTime - b.totalTime;
+	});
+
+	if(individuals[0].totalTime < variables.bestIndividual.totalTime || variables.generation === 0) {
+		variables.bestIndividual = individuals[0];
+		variables.bestIndividual.draw();
+		outputToPage("New Best Individual!");
+	}
+	outputToPage("Best individual for generation " + variables.generation.toString() + " finished at timestep " + individuals[0].totalTime.toString());
+	outputToPage("Best individual overall at generation " + variables.generation.toString() + " finished at timestep " + variables.bestIndividual.totalTime.toString());
+
+	var newGAPattern = [];
+
+	// 1+2+3+4+...+30 = 465
+	for(var parent = 0; parent < 30; parent++) {
+		var rankBased = Math.floor(Math.random() * 465);
+
+		var runningRank = 0;
+		var rank = 0;
+		for(rank = 0; rank < 30 && rankBased > runningRank; rank++) {
+			runningRank += (30-rank);
+		}
+		newGAPattern.push(individuals[rank].gaPattern);
+
+		// Mutation
+		for(var chromosome = 0; chromosome < (variables.numJobs * variables.numMachines); chromosome++) {
+			var mutation = Math.random();
+
+			if(mutation < 0.10) {
+				var newHeuristic = Math.floor(Math.random() * 6);
+				newGAPattern[parent][chromosome].heuristic = newHeuristic;
+				mutation = Math.random();
+				if(mutation < 0.50) {
+					var newMethod = Math.floor(Math.random() * 2);
+					newGAPattern[parent][chromosome].method = newMethod;
+				}
+			}
+		}
 		
-		individuals.sort(function (a, b) {
-			return a.totalTime - b.totalTime;
-		});
+		// Crossover
+		if (parent % 2 === 0 && parent > 0) {
+			// Crossover always happens
+			var crossoverPoint = Math.floor(Math.random () * (variables.numJobs * variables.numMachines - 1));
 
-		individuals[0].draw();
-
-		if(individuals[0].totalTime < bestIndividual.totalTime || generation === 0) {
-			bestIndividual = individuals[0];
-			outputToPage("New Best Individual!");
-		}
-		outputToPage("Best individual for generation " + generation.toString() + " finished at timestep " + individuals[0].totalTime.toString());
-		outputToPage("Best individual overall at generation " + generation.toString() + " finished at timestep " + bestIndividual.totalTime.toString());
-
-		var newGAPattern = [];
-
-		// 1+2+3+4+...+30 = 465
-		for(var parent = 0; parent < 30; parent++) {
-			var rankBased = Math.floor(Math.random() * 465);
-
-			var runningRank = 0;
-			var rank = 0;
-			for(rank = 0; rank < 30 && rankBased > runningRank; rank++) {
-				runningRank += (30-rank);
+			for(var crossover = crossoverPoint; crossover < (variables.numJobs * variables.numMachines); crossover++) {
+				var temp = newGAPattern[parent][crossover];
+				newGAPattern[parent][crossover] = newGAPattern[parent - 1][crossover];
+				newGAPattern[parent - 1][crossover] = temp;
 			}
-			newGAPattern.push(individuals[rank].gaPattern);
-
-			// Mutation
-			for(var chromosome = 0; chromosome < (numJobs * numMachines); chromosome++) {
-				var mutation = Math.random();
-
-				if(mutation < 0.10) {
-					var newHeuristic = Math.floor(Math.random() * 6);
-					newGAPattern[parent][chromosome].heuristic = newHeuristic;
-					mutation = Math.random();
-					if(mutation < 0.50) {
-						var newMethod = Math.floor(Math.random() * 2);
-						newGAPattern[parent][chromosome].method = newMethod;
-					}
-				}
-			}
-			
-			// Crossover
-			if (parent % 2 === 0 && parent > 0) {
-				// Crossover always happens
-				var crossoverPoint = Math.floor(Math.random () * (numJobs * numMachines - 1));
-
-				for(var crossover = crossoverPoint; crossover < (numJobs * numMachines); crossover++) {
-					var temp = newGAPattern[parent][crossover];
-					newGAPattern[parent][crossover] = newGAPattern[parent - 1][crossover];
-					newGAPattern[parent - 1][crossover] = temp;
-				}
-			}
-		}
-
-		// Kill off parents, let the children rule the world (like Lord of the Flies)
-		individuals = [];
-		for(var children = 0; children < 30; children++) {
-			individuals.push(new Individual(text, newGAPattern[children]));
 		}
 	}
 
+	// Kill off parents, let the children rule the world (like Lord of the Flies)
+	individuals = [];
+	for(var children = 0; children < 30; children++) {
+		individuals.push(new Individual(variables.text, newGAPattern[children]));
+	}
+
+	variables.generation++;
+
+	// method to generate an function reference with properly scoped variables
+	var fnGenerator = function(individuals, variables) {
+	    var wrapperFn = function() {
+	        generation(individuals, variables);
+	    };
+	    return wrapperFn;
+	};
+
+	// call the generator and return the wrapping function
+	var fnToCall = fnGenerator(individuals, variables);
+
+	if (variables.generation < 30) {
+		setTimeout(fnToCall, 10);
+	}
+
+	console.log('Timeout set');
 }

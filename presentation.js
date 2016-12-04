@@ -1,7 +1,7 @@
  'use strict';
 
 window.onload = function () {
-	google.charts.load('current', {'packages':['timeline']});
+	google.charts.load('current', {'packages':['timeline', 'line']});
 	addEventListeners();
 };
 
@@ -11,6 +11,13 @@ function addEventListeners () {
 
 	$parseButton.addEventListener('click', initialize);
 
+	var $clearButton = document.getElementById('clearData');
+	$clearButton.addEventListener('click', clearTextInput);
+
+}
+
+function clearTextInput () {
+	document.getElementById('textinput').value = '';
 }
 
 function outputToPage(newText) {

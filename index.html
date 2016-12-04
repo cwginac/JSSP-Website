@@ -10,10 +10,14 @@
     <script src="logic.js"></script>
 
     <style>
+		body {
+			font-family: Arial;
+		}
+
     	.shell-wrap {
 			  width: 500px;
 			  height: 300px;
-			  margin: 100px auto 0 auto;
+			  /*margin: 100px auto 0 auto;*/
 			  box-shadow: 0 0 30px rgba(0,0,0,0.4);
 			 
 			  -webkit-border-radius: 3px;
@@ -59,16 +63,35 @@
 			  border-bottom-right-radius: 3px;
 			  border-bottom-left-radius: 3px;
 			}
+
+			.inputDataArea {
+				height: 200px;
+				width: 500px;
+			}
+			.charts {
+				height: 400px;
+			}
+			.barchart_material {
+				background: #D3D3D3;
+				width: 900px;
+				height: 300px;
+			}
     	}
     </style>
 </head>
 
 <body>
-<textarea id="textinput"></textarea>
-<button id="parseData">Parse Data</button>
+<div class="inputDataArea">
+	<textarea id="textinput" rows="10" cols="50"></textarea> 
+	<br />
+	<button id="parseData">Parse Data</button> <button id="clearData">Clear</button>
+</div>
 
-
-<div id="barchart_material" style="width: 900px; height: 300px;"></div>
+<div class="charts">
+	<div id="linechart_material"></div>
+	Best Solution To JSSP
+	<div class="barchart_material" id="barchart_material"></div>
+</div>
 
 
 <div class="shell-wrap">
