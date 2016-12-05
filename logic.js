@@ -34,8 +34,10 @@ class Individual {
 
 		var numJobs = jobsArray.length;
 
+		var numMachines = 0;
+
 		for(var c = 0; c < numJobs; c++) {
-			var array = jobsArray[c].split('  ');
+			var array = jobsArray[c].split(' ');
 			
 			var job = {
 				instructions: [],
@@ -48,6 +50,7 @@ class Individual {
 
 			var instruction = {};
 			var len = array.length;
+			numMachines = len / 2;
 			for (var i = 0; i < len; i++) {
 				if (i % 2 === 0) {
 					instruction.machine = array[i];
@@ -63,7 +66,7 @@ class Individual {
 			this.jssp.jobs.push(job);
 		}
 
-		for (var m = 0; m < 5; m++) {
+		for (var m = 0; m < numMachines; m++) {
 			var machine = {
 				id: m,
 				scheduledOperations: [],
@@ -221,8 +224,9 @@ class Individual {
 		// If there is no more remaining work for this job, mark it as complete
 		if(this.jssp.jobs[job].instructions.length === 0) {
 			this.jssp.jobs[job].finished = true;
-			// outputToPage('Job ' + job + ' finished at timestep ' + operation.end + '!');
-			this.totalTime = operation.end;
+			if (operation.end > this.totalTime)  {
+				this.totalTime = operation.end;
+			}
 		}
 	}
 
@@ -372,17 +376,22 @@ function initialize () {
 		numJobs: 0,
 		numMachines: 0,
 		bestIndividual: {},
-		generation: 0
+		generation: 0,
+		run: 0
 	};
 
 	var jobsArray = variables.text.split('\n');
 
 	variables.numJobs = jobsArray.length;
 
-	var	array = jobsArray[0].split('  ');
+	var	array = jobsArray[0].split(' ');
 
 	variables.numMachines = array.length / 2;
 
+	population(variables);
+}
+
+function population (variables) {
 	var individuals = [];
 
 	for(var individual = 0; individual < 30; individual++) {
@@ -399,22 +408,22 @@ function initialize () {
 		}
 		individuals.push(new Individual(variables.text, gaPattern));
 	}
-	generation(individuals, variables)
+	generation(individuals, variables);
 }
 
 function generation (individuals, variables) {
-	console.log('New generation');
 	individuals.sort(function (a, b) {
 		return a.totalTime - b.totalTime;
 	});
 
-	if(individuals[0].totalTime < variables.bestIndividual.totalTime || variables.generation === 0) {
+	if(variables.bestIndividual.totalTime === undefined || individuals[0].totalTime < variables.bestIndividual.totalTime) {
 		variables.bestIndividual = individuals[0];
 		variables.bestIndividual.draw();
 		outputToPage("New Best Individual!");
 	}
-	outputToPage("Best individual for generation " + variables.generation.toString() + " finished at timestep " + individuals[0].totalTime.toString());
-	outputToPage("Best individual overall at generation " + variables.generation.toString() + " finished at timestep " + variables.bestIndividual.totalTime.toString());
+
+	outputToPage("Best individual for Run " + variables.run + " Gen " + variables.generation + " finished at timestep " + individuals[0].totalTime.toString());
+	outputToPage("Best individual overall for Run " + variables.run + " Gen " + variables.generation + " finished at timestep " + variables.bestIndividual.totalTime.toString());
 
 	var newGAPattern = [];
 
@@ -476,9 +485,22 @@ function generation (individuals, variables) {
 	// call the generator and return the wrapping function
 	var fnToCall = fnGenerator(individuals, variables);
 
-	if (variables.generation < 30) {
+	// method to generate an function reference with properly scoped variables
+	var fnPopulationGenerator = function(variables) {
+	    var wrapperFn = function() {
+	        population(variables);
+	    };
+	    return wrapperFn;
+	};
+
+	var populationFnToCall = fnPopulationGenerator(variables);
+
+	if (variables.generation < 5) {
 		setTimeout(fnToCall, 10);
 	}
-
-	console.log('Timeout set');
+	else if (variables.run < 50) {
+		variables.run++;
+		variables.generation = 0;
+		setTimeout(populationFnToCall, 10);
+	}
 }
