@@ -1,5 +1,11 @@
 'use strict';
 
+var populationSize = 100;
+var maxGens = 150;
+
+var pMut = .02;
+var originalPMut = .02;
+
 class Individual {
 	constructor (inputString, gaPattern) {
 		this.inputString = inputString;
@@ -22,10 +28,17 @@ class Individual {
 	 */
 	parseData () {
 		// Reset Everything
+		this.currentGaPatternElement = 0;
+		this.totalTime = -1;
+		this.jssp = {
+			jobs: [],
+			machines: [],
+			currentTime: 0,
+			dataTable: {},
+			operationsToSchedule: []
+		};
+
 		this.createDataTable();
-		this.jssp.jobs = [];
-		this.jssp.machines = [];
-		this.jssp.currentTime = 0;
 
 		// Start Parsing Data
 		var text =  this.inputString;
@@ -377,8 +390,28 @@ function initialize () {
 		numMachines: 0,
 		bestIndividual: {},
 		generation: 0,
-		run: 0
+		run: 0,
+		data: {},
+		options: {},
+		chart: {}
 	};
+
+	variables.data = new google.visualization.DataTable();
+	variables.data.addColumn('number', 'X');
+	variables.data.addColumn('number', 'Overall Best');
+	variables.data.addColumn('number', 'Current Best');
+	variables.data.addColumn('number', 'Current Average');
+
+	variables.options = {
+		hAxis: {
+			title: 'Generation'
+		},
+		vAxis: {
+			title: 'Total Time'
+		}
+	};
+
+	variables.chart = new google.visualization.LineChart(document.getElementById('linechart_div'));
 
 	var jobsArray = variables.text.split('\n');
 
@@ -394,7 +427,7 @@ function initialize () {
 function population (variables) {
 	var individuals = [];
 
-	for(var individual = 0; individual < 30; individual++) {
+	for(var individual = 0; individual < populationSize; individual++) {
 		var gaPattern = [];
 
 		for(var machine = 0; machine < variables.numMachines; machine++) {
@@ -412,66 +445,99 @@ function population (variables) {
 }
 
 function generation (individuals, variables) {
-	individuals.sort(function (a, b) {
-		return a.totalTime - b.totalTime;
-	});
-
-	if(variables.bestIndividual.totalTime === undefined || individuals[0].totalTime < variables.bestIndividual.totalTime) {
-		variables.bestIndividual = individuals[0];
-		variables.bestIndividual.draw();
-		outputToPage("New Best Individual!");
-	}
-
-	outputToPage("Best individual for Run " + variables.run + " Gen " + variables.generation + " finished at timestep " + individuals[0].totalTime.toString());
-	outputToPage("Best individual overall for Run " + variables.run + " Gen " + variables.generation + " finished at timestep " + variables.bestIndividual.totalTime.toString());
-
-	var newGAPattern = [];
-
 	// 1+2+3+4+...+30 = 465
-	for(var parent = 0; parent < 30; parent++) {
-		var rankBased = Math.floor(Math.random() * 465);
+	// 1+2+3+...+populationSize = (populationSize*(populationSize+1)) / 2
+	for(var children = 0; children < populationSize; children++) {
+		var parent1 = Math.floor(Math.random() * ((populationSize*(populationSize+1)) / 2));
 
 		var runningRank = 0;
-		var rank = 0;
-		for(rank = 0; rank < 30 && rankBased > runningRank; rank++) {
-			runningRank += (30-rank);
+		var rank1 = 0;
+		for(rank1 = 0; rank1 < populationSize && parent1 > runningRank; rank1++) {
+			runningRank += (populationSize-rank1);
 		}
-		newGAPattern.push(individuals[rank].gaPattern);
 
-		// Mutation
+		var parent2 = Math.floor(Math.random() * ((populationSize*(populationSize+1)) / 2));
+
+		runningRank = 0;
+		var rank2 = 0;
+		for(rank2 = 0; rank2 < populationSize && parent2 > runningRank; rank2++) {
+			runningRank += (populationSize-rank2);
+		}
+
+		var gaPattern1 = JSON.parse(JSON.stringify(individuals[rank1].gaPattern));
+		var gaPattern2 = JSON.parse(JSON.stringify(individuals[rank2].gaPattern));
+		
+		// Crossover always happens
+		for(var crossover = 0; crossover < (variables.numJobs * variables.numMachines); crossover++) {
+			var swap = Math.floor(Math.random() * 2);
+
+			if(swap === 1) {
+				var temp = gaPattern1[crossover];
+				gaPattern1[crossover] = gaPattern2[crossover];
+				gaPattern2[crossover] = temp;
+			}
+		}
+
+		individuals.push(new Individual (individuals[rank1].inputString, gaPattern1));
+		individuals.push(new Individual (individuals[rank2].inputString, gaPattern2));
+	}
+
+	for(var individual = 0; individual < individuals.length; individual++) {
+		var individualChanged = false;
 		for(var chromosome = 0; chromosome < (variables.numJobs * variables.numMachines); chromosome++) {
 			var mutation = Math.random();
 
-			if(mutation < 0.10) {
+			if(mutation < pMut) {
 				var newHeuristic = Math.floor(Math.random() * 6);
-				newGAPattern[parent][chromosome].heuristic = newHeuristic;
+				individuals[individual].gaPattern[chromosome].heuristic = newHeuristic;
 				mutation = Math.random();
 				if(mutation < 0.50) {
 					var newMethod = Math.floor(Math.random() * 2);
-					newGAPattern[parent][chromosome].method = newMethod;
+					individuals[individual].gaPattern[chromosome].method = newMethod;
 				}
+				individualChanged = true;
 			}
 		}
-		
-		// Crossover
-		if (parent % 2 === 0 && parent > 0) {
-			// Crossover always happens
-			var crossoverPoint = Math.floor(Math.random () * (variables.numJobs * variables.numMachines - 1));
 
-			for(var crossover = crossoverPoint; crossover < (variables.numJobs * variables.numMachines); crossover++) {
-				var temp = newGAPattern[parent][crossover];
-				newGAPattern[parent][crossover] = newGAPattern[parent - 1][crossover];
-				newGAPattern[parent - 1][crossover] = temp;
-			}
+		if (individualChanged === true) {
+			individuals[individual].parseData();
 		}
 	}
 
-	// Kill off parents, let the children rule the world (like Lord of the Flies)
-	individuals = [];
-	for(var children = 0; children < 30; children++) {
-		individuals.push(new Individual(variables.text, newGAPattern[children]));
+	// Sort individuals and kill off weaker individuals
+	individuals.sort(function (a, b) {
+		return a.totalTime - b.totalTime;
+	});
+	individuals.splice(populationSize);
+
+	// Save off best individual
+	if(variables.bestIndividual.totalTime === undefined || individuals[0].totalTime < variables.bestIndividual.totalTime) {
+		variables.bestIndividual = new Individual(individuals[0].inputString, individuals[0].gaPattern);
+		variables.bestIndividual.draw();
+		//outputToPage("New Best Individual!");
 	}
 
+	// Compute Average
+	var average = 0.0;
+	for (var a = 0; a < populationSize; a++) {
+		average += individuals[a].totalTime;
+	}
+	average = average / populationSize;
+
+	//outputToPage("Best individual overall for Gen " + variables.generation + " finished at timestep " + variables.bestIndividual.totalTime.toString());
+	//outputToPage("Best individual for Gen " + variables.generation + " finished at timestep " + individuals[0].totalTime.toString());
+	//outputToPage("Average fitness for Gen " + variables.generation + " is " + average);
+
+	variables.data.addRow([variables.generation, variables.bestIndividual.totalTime, individuals[0].totalTime, average]);
+
+	variables.chart.draw(variables.data, variables.options);
+
+	if(average === individuals[0].totalTime) {
+		pMut = 0.5;
+	}
+	else {
+		pMut = originalPMut;
+	}
 	variables.generation++;
 
 	// method to generate an function reference with properly scoped variables
@@ -485,22 +551,7 @@ function generation (individuals, variables) {
 	// call the generator and return the wrapping function
 	var fnToCall = fnGenerator(individuals, variables);
 
-	// method to generate an function reference with properly scoped variables
-	var fnPopulationGenerator = function(variables) {
-	    var wrapperFn = function() {
-	        population(variables);
-	    };
-	    return wrapperFn;
-	};
-
-	var populationFnToCall = fnPopulationGenerator(variables);
-
-	if (variables.generation < 5) {
+	if (variables.generation < maxGens) {
 		setTimeout(fnToCall, 10);
-	}
-	else if (variables.run < 50) {
-		variables.run++;
-		variables.generation = 0;
-		setTimeout(populationFnToCall, 10);
 	}
 }

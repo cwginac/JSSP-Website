@@ -1,7 +1,7 @@
  'use strict';
 
 window.onload = function () {
-	google.charts.load('current', {'packages':['timeline', 'line']});
+	google.charts.load('current', {'packages':['timeline', 'corechart', 'line']});
 	addEventListeners();
 };
 
