@@ -6,6 +6,11 @@ var maxGens = 150;
 var pMut = .02;
 var originalPMut = .02;
 
+var collectData = false;
+var statisticalData = [];
+var maxRuns = 30;
+var runs = 0;
+
 class Individual {
 	constructor (inputString, gaPattern) {
 		this.inputString = inputString;
@@ -383,6 +388,12 @@ class Individual {
 }
 
 function initialize () {
+	if(statisticalData.length === 0 && collectData) {
+		setupStatisticalData();
+	}
+	document.getElementById('textinput').disabled = true;
+	document.getElementById('parseData').disabled = true;
+	document.getElementById('clearData').disabled = true;
 
 	var variables = {
 		text: document.getElementById('textinput').value,
@@ -404,10 +415,15 @@ function initialize () {
 
 	variables.options = {
 		hAxis: {
-			title: 'Generation'
+			title: 'Generation',
+			format: '0',
+			viewWindow: {
+				min: 0
+			}
 		},
 		vAxis: {
-			title: 'Total Time'
+			title: 'Total Time',
+			format: '0'
 		}
 	};
 
@@ -530,14 +546,16 @@ function generation (individuals, variables) {
 
 	variables.data.addRow([variables.generation, variables.bestIndividual.totalTime, individuals[0].totalTime, average]);
 
+	if(collectData) {
+		statisticalData[variables.generation].best += variables.bestIndividual.totalTime;
+		statisticalData[variables.generation].currentBest += individuals[0].totalTime;
+		statisticalData[variables.generation].average += average;
+		statisticalData[variables.generation].numberOfDataPoints++;
+	}
+
 	variables.chart.draw(variables.data, variables.options);
 
-	if(average === individuals[0].totalTime) {
-		pMut = 0.5;
-	}
-	else {
-		pMut = originalPMut;
-	}
+	var converged = (average === individuals[0].totalTime);
 	variables.generation++;
 
 	// method to generate an function reference with properly scoped variables
@@ -551,7 +569,45 @@ function generation (individuals, variables) {
 	// call the generator and return the wrapping function
 	var fnToCall = fnGenerator(individuals, variables);
 
-	if (variables.generation < maxGens) {
+	if (variables.generation < maxGens && converged === false) {
 		setTimeout(fnToCall, 10);
 	}
+	else {
+		document.getElementById('textinput').disabled = false;
+		document.getElementById('parseData').disabled = false;
+		document.getElementById('clearData').disabled = false;
+		//alert ('HGA has converged.  Best solution found displayed below.  Best time: ' + variables.bestIndividual.totalTime);
+
+		if(runs < maxRuns) {
+			runs++;
+			initialize ();
+		}
+		else if(collectData){
+			outputStatisticalData();
+		}
+	}
+}
+
+function setupStatisticalData() {
+	for(var a = 0; a < maxGens; a++) {
+		var runData = {
+			best: 0,
+			currentBest: 0,
+			average: 0,
+			numberOfDataPoints: 0,
+		};
+		statisticalData.push(runData);
+	}
+}
+
+function outputStatisticalData() {
+	var outputString = '';
+	for(var b = 0; b < maxGens; b++) {
+		outputString += b.toString() + ', ' + (statisticalData[b].best / statisticalData[b].numberOfDataPoints).toString() + ', ';
+		outputString += (statisticalData[b].currentBest / statisticalData[b].numberOfDataPoints).toString() + ', ';
+		outputString += (statisticalData[b].average / statisticalData[b].numberOfDataPoints).toString() + ', ';
+		outputString += statisticalData[b].numberOfDataPoints + '\n';
+	}
+
+	document.getElementById('textinput').value = outputString;
 }
