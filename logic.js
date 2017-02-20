@@ -3,8 +3,8 @@
 var populationSize = 100;
 var maxGens = 150;
 
-var pMut = .02;
-var originalPMut = .02;
+var pMut = 0.02;
+var originalPMut = 0.02;
 
 var collectData = false;
 var statisticalData = [];
@@ -47,15 +47,24 @@ class Individual {
 
 		// Start Parsing Data
 		var text =  this.inputString;
-
 		var jobsArray = text.split('\n');
 
+		if (jobsArray[0][1] == '+') {
+			jobsArray.splice (0, 3);
+			jobsArray.splice (jobsArray.length - 1, 1);
+		}
+		else{
+			jobsArray.splice (0, 2);
+		}
+		var numMachines = 0;
 		var numJobs = jobsArray.length;
 
-		var numMachines = 0;
-
 		for(var c = 0; c < numJobs; c++) {
-			var array = jobsArray[c].split(' ');
+			var array = jobsArray[c].split(/\s+/);
+
+			if (array[0] === '') {
+				array.splice (0, 1);
+			}
 			
 			var job = {
 				instructions: [],
@@ -431,12 +440,23 @@ function initialize () {
 
 	var jobsArray = variables.text.split('\n');
 
+	if (jobsArray[0][1] == '+') {
+		jobsArray.splice (0, 3);
+		jobsArray.splice (jobsArray.length - 1, 1);
+	}
+	else{
+		jobsArray.splice (0, 2);
+	}
+
 	variables.numJobs = jobsArray.length;
 
-	var	array = jobsArray[0].split(' ');
+	var	array = jobsArray[0].split(/\s+/);
+
+	if (array [0] === '') {
+		array.splice (0, 1);
+	}
 
 	variables.numMachines = array.length / 2;
-
 	population(variables);
 }
 
@@ -576,9 +596,9 @@ function generation (individuals, variables) {
 		document.getElementById('textinput').disabled = false;
 		document.getElementById('parseData').disabled = false;
 		document.getElementById('clearData').disabled = false;
-		//alert ('HGA has converged.  Best solution found displayed below.  Best time: ' + variables.bestIndividual.totalTime);
+		alert ('HGA has converged.  Best solution found displayed below.  Best time: ' + variables.bestIndividual.totalTime);
 
-		if(runs < maxRuns) {
+		if(runs < maxRuns && collectData) {
 			runs++;
 			initialize ();
 		}

@@ -15,8 +15,6 @@
 		}
 
 		.shell-wrap {
-			float:left;
-			margin-left: 20px;
 			width: 600px;
 			height: 400px;
 			background: #D3D3D3;
@@ -30,15 +28,12 @@
 		}
 
 		.inputDataArea {
-			float: left;
 			margin-top: 50px;
-			height: 200px;
 			width: 500px;
 			font-size: .750em;
 		}
 		.charts {
-			float: left;
-			height: 400px;
+			height: 350px;
 			margin-top: 50px;
 		}
 		.barchart_material {
@@ -50,23 +45,34 @@
 </head>
 
 <body>
-<div class="upperPane">
+<div class="header">
+	<center><font color="blue" size="5">Job Shop Schedule Problem Solver</font><br>
+	<font size="2">ECSL, Department of Computer Science and Engineering, University of Nevada - Reno<br>
+	Based upon <a href="http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.142.1625&rep=rep1&type=pdf">A Hueristic Combination Method for Solving Job-Shop Scheduling Problems</a><br>by Emma Hart and Peter Ross - Department of Artificial Intelligence, University of Edinburgh
+	</font>
+	</center>
+</div>	
+<div class="upperPanel">
 	<div class="inputDataArea">
-		Input your JSSP data here. <a href="https://www.cse.unr.edu/~ginacc/testproblem">Example JSSP data format</a>
-		<textarea id="textinput" rows="15" cols="70" placeholder="Input JSSP Data Here"></textarea> 
+		Input your JSSP data here. <a href="http://people.brunel.ac.uk/~mastjjb/jeb/orlib/files/jobshop1.txt">OR-Library JSSP Test Data</a>
+		<br /><br />
+		Follow link above for formatting instructions. If using a test example from the OR-Library, copy/paste only data between ++++ lines.  The parser for this solver will assume one line for description, one line for the number of jobs and the number of machines, then the JSSP data.
+
+		<textarea id="textinput" rows="15" cols="70" placeholder="FORMAT: <br> Blah"></textarea> 
 		<br />
 		<button id="parseData">Parse Data</button> <button id="clearData">Clear</button>
 	</div>
-
-	<div class="shell-wrap">
-	  <div class="shell-body" id= "linechart_div" ></div>
-	</div>
 </div>
-
+<br>
 <div class="charts">
 	<div id="linechart_material"></div>
 	Best Solution To JSSP
 	<div class="barchart_material" id="barchart_material"></div>
+</div>
+
+Genetic Algorithm Progress
+<div class="shell-wrap">
+  <div class="shell-body" id= "linechart_div" ></div>
 </div>
 
 
